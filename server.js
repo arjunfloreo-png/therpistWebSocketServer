@@ -3,8 +3,16 @@ const http = require('http');
 
 const PORT = process.env.PORT || 10000;
 
-const server = http.createServer();
+// HTTP server
+const server = http.createServer((req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/plain',
+  });
 
+  res.end('WebSocket server is running');
+});
+
+// WebSocket server
 const wss = new WebSocket.Server({ server });
 
 wss.on('connection', (ws) => {
@@ -21,6 +29,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`WebSocket server running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
 });
