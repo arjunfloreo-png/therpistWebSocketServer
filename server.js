@@ -3,32 +3,65 @@ const http = require('http');
 
 const PORT = process.env.PORT || 10000;
 
-// HTTP server
 const server = http.createServer((req, res) => {
-  res.writeHead(200, {
-    'Content-Type': 'text/plain',
-  });
-
-  res.end('WebSocket server is running');
+  res.writeHead(200);
+  res.end('WebSocket server running');
 });
 
-// WebSocket server
 const wss = new WebSocket.Server({ server });
 
-wss.on('connection', (ws) => {
-  console.log('Client connected');
+let therapist = null;
+let clientUser = null;
 
-  ws.send('Hello from Render WebSocket server');
+wss.on('connection', (ws) => {
+
+  console.log('Connected');
 
   ws.on('message', (message) => {
-    console.log('Received:', message.toString());
+
+    const data = JSON.parse(message);
+
+    // Register therapist
+    if (data.type === 'register' && data.role === 'therapist') {
+      therapist = ws;
+      console.log('Therapist registered');
+      return;
+    }
+
+    // Register client
+    if (data.type === 'register' && data.role === 'client') {
+      clientUser = ws;
+      console.log('Client registered');
+      return;
+    }
+
+    // Therapist sends message to client only
+    if (data.type === 'message' && ws === therapist) {
+
+      if (
+        clientUser &&
+        clientUser.readyState === WebSocket.OPEN
+      ) {
+        clientUser.send(JSON.stringify({
+          from: 'therapist',
+          message: data.message
+        }));
+      }
+
+    }
+
   });
 
   ws.on('close', () => {
-    console.log('Client disconnected');
+
+    if (ws === therapist) therapist = null;
+    if (ws === clientUser) clientUser = null;
+
+    console.log('Disconnected');
   });
+
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Running on port ${PORT}`);
 });
