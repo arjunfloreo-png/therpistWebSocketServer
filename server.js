@@ -3,101 +3,130 @@ const http = require('http');
 
 const PORT = process.env.PORT || 10000;
 
+// HTTP server
 const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('1-to-1 Therapist WebSocket Server Running');
+
+  res.writeHead(200, {
+    'Content-Type': 'text/plain',
+  });
+
+  res.end('Therapist WebSocket Server Running');
 });
 
+// WebSocket server
 const wss = new WebSocket.Server({ server });
 
-// SINGLE CONNECTIONS ONLY
+// Store users
 let therapist = null;
-let client = null;
-
-function send(ws, data) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(data));
-  }
-}
+let clientUser = null;
 
 wss.on('connection', (ws) => {
+
   console.log('New connection');
 
   ws.on('message', (message) => {
+
     try {
+
       const data = JSON.parse(message);
 
-      // -----------------------
-      // REGISTER THERAPIST
-      // -----------------------
-      if (data.type === 'register' && data.role === 'therapist') {
+      console.log('Received:', data);
+
+      // Register therapist
+      if (
+        data.type === 'register' &&
+        data.role === 'therapist'
+      ) {
+
         therapist = ws;
-        ws.role = 'therapist';
 
-        console.log('Therapist connected');
+        console.log('Therapist registered');
+
         return;
       }
 
-      // -----------------------
-      // REGISTER CLIENT
-      // -----------------------
-      if (data.type === 'register' && data.role === 'client') {
-        client = ws;
-        ws.role = 'client';
+      // Register client
+      if (
+        data.type === 'register' &&
+        data.role === 'client'
+      ) {
 
-        console.log('Client connected');
+        clientUser = ws;
+
+        console.log('Client registered');
+
         return;
       }
 
-      // -----------------------
-      // VIDEO (THERAPIST → CLIENT)
-      // -----------------------
-      if (data.type === 'video' && ws === therapist) {
-        if (client) {
-          send(client, {
+      // Therapist sends message
+      if (
+        data.type === 'message' &&
+        ws === therapist
+      ) {
+
+        if (
+          clientUser &&
+          clientUser.readyState === WebSocket.OPEN
+        ) {
+
+          clientUser.send(JSON.stringify({
+            type: 'message',
+            from: 'therapist',
+            message: data.message
+          }));
+
+          console.log('Message sent to client');
+        }
+      }
+
+      // Therapist sends video
+      if (
+        data.type === 'video' &&
+        ws === therapist
+      ) {
+
+        if (
+          clientUser &&
+          clientUser.readyState === WebSocket.OPEN
+        ) {
+
+          clientUser.send(JSON.stringify({
             type: 'video',
-            url: data.url,
-          });
+            url: data.url
+          }));
 
           console.log('Video sent to client');
         }
-        return;
       }
 
-      // -----------------------
-      // REACTION (THERAPIST → CLIENT)
-      // -----------------------
-      if (data.type === 'reaction' && ws === therapist) {
-        if (client) {
-          send(client, {
-            type: 'reaction',
-            emoji: data.emoji,
-            label: data.label,
-          });
+    } catch (error) {
 
-          console.log('Reaction sent to client');
-        }
-        return;
-      }
-
-    } catch (err) {
-      console.log('Error:', err.message);
+      console.log('Error:', error.message);
     }
   });
 
   ws.on('close', () => {
+
     if (ws === therapist) {
+
       therapist = null;
+
       console.log('Therapist disconnected');
     }
 
-    if (ws === client) {
-      client = null;
+    if (ws === clientUser) {
+
+      clientUser = null;
+
       console.log('Client disconnected');
     }
   });
 });
 
+// Start server
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+
+  console.log(
+    `WebSocket server running on port ${PORT}`
+  );
 });
